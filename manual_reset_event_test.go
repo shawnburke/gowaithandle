@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,23 +45,29 @@ func TestManualSimple(t *testing.T) {
 
 func TestManualMultiSignaled(t *testing.T) {
 
+	// tests many threads using the event
 	mre := NewManualResetEvent(true)
 
 	finished := int32(0)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 4; i++ {
+	n := 100
+
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := <-mre.WaitOne(time.Millisecond)
+			// set a randome timeout and random start
+			wait := time.Millisecond * time.Duration(rand.Intn(20))
+			time.Sleep(wait)
+			res := <-mre.WaitOne(time.Second / 2)
 			if res {
 				atomic.AddInt32(&finished, 1)
 			}
 		}()
 	}
 	wg.Wait()
-	require.Equal(t, 4, int(finished))
+	require.Equal(t, n, int(finished))
 
 }
 

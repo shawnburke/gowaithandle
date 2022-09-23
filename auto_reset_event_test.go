@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,9 +51,14 @@ func TestAutoMulti(t *testing.T) {
 
 	counter := int32(0)
 	next := make(chan int)
-	for i := 0; i < 4; i++ {
+	n := 100
+	for i := 0; i < n; i++ {
 		go func(i int) {
-			res := <-auto.WaitOne(time.Millisecond * 10)
+			// create jitter
+			ms := time.Duration(10 + rand.Intn(20))
+			time.Sleep(ms)
+
+			res := <-auto.WaitOne(time.Second / 2)
 			if res {
 				atomic.AddInt32(&counter, 1)
 			}
@@ -60,18 +66,17 @@ func TestAutoMulti(t *testing.T) {
 		}(i)
 	}
 
-	auto.Set()
-	<-next
-	require.Equal(t, 1, int(counter))
-	auto.Set()
-	<-next
-	require.Equal(t, 2, int(counter))
-	auto.Set()
-	<-next
-	require.Equal(t, 3, int(counter))
+	// do all but the last one
+	for i := 0; i < n-1; i++ {
+		auto.Set()
+		<-next
+		c := int(atomic.LoadInt32(&counter))
+		require.Equal(t, i+1, c)
+	}
 
 	// last one should time out
 	<-next
-	require.Equal(t, 3, int(counter))
+	c := int(atomic.LoadInt32(&counter))
+	require.Equal(t, n-1, c)
 
 }
