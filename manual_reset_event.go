@@ -1,7 +1,6 @@
 package gowaithandle
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -9,9 +8,10 @@ import (
 // ManualResetEvent blocks all threads until
 // signaled, then lets them all through
 type ManualResetEvent struct {
-	sync.RWMutex
-	set      chan struct{}
-	signaled int32
+	set        chan struct{}
+	setVersion int64
+	signaled   int32
+	version    int64
 }
 
 var _ EventWaitHandle = &ManualResetEvent{}
@@ -27,7 +27,6 @@ func NewManualResetEvent(signaled bool) *ManualResetEvent {
 }
 
 func (mre *ManualResetEvent) WaitOne(timeout time.Duration) <-chan bool {
-
 	return waitOne(mre.getSignal(), timeout)
 }
 
@@ -39,24 +38,22 @@ func (mre *ManualResetEvent) getSignal() chan struct{} {
 		return c
 	}
 
-	if mre.set != nil {
-		mre.Lock()
-		defer mre.Unlock()
-		if mre.set == nil {
-			mre.set = make(chan struct{})
-		}
+	// if the version and set version are the same,
+	// it means we need a new signal channel so we create
+	// one and increment the version
+	v := atomic.LoadInt64(&mre.version)
+	sv := atomic.LoadInt64(&mre.setVersion)
+	next := v + 1
+	if v == sv && atomic.CompareAndSwapInt64(&mre.version, v, next) {
+		mre.set = make(chan struct{})
+		atomic.StoreInt64(&mre.setVersion, next)
 	}
 	return mre.set
 }
 
 func (mre *ManualResetEvent) Set() bool {
 	if atomic.CompareAndSwapInt32(&mre.signaled, 0, 1) {
-		mre.Lock()
-		defer mre.Unlock()
-		if mre.set != nil {
-			close(mre.set)
-			mre.set = nil
-		}
+		close(mre.set)
 		return true
 	}
 	return false

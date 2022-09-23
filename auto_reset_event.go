@@ -2,6 +2,7 @@ package gowaithandle
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -10,17 +11,16 @@ import (
 type AutoResetEvent struct {
 	sync.RWMutex
 	signals chan struct{}
+	created int32
 }
 
 var _ EventWaitHandle = &AutoResetEvent{}
 
 func NewAutoResetEvent(signaled bool) *AutoResetEvent {
 	are := &AutoResetEvent{}
-
 	if signaled {
 		are.Set()
 	}
-
 	return are
 }
 
@@ -29,10 +29,18 @@ func (are *AutoResetEvent) WaitOne(timeout time.Duration) <-chan bool {
 }
 
 func (are *AutoResetEvent) getSignals() chan struct{} {
-	are.Lock()
-	defer are.Unlock()
-	if are.signals == nil {
-		are.signals = make(chan struct{}, 1)
+
+	// use a lock here but only in the default
+	// non-created state, which allows us
+	// to lazily create the channel but only take
+	// the lock once to avoid contention in the future
+	if atomic.LoadInt32(&are.created) == 0 {
+		are.Lock()
+		if are.signals == nil {
+			are.signals = make(chan struct{}, 1)
+		}
+		atomic.StoreInt32(&are.created, 1)
+		are.Unlock()
 	}
 	return are.signals
 }
