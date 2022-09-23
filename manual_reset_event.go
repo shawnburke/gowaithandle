@@ -28,17 +28,7 @@ func NewManualResetEvent(signaled bool) *ManualResetEvent {
 
 func (mre *ManualResetEvent) WaitOne(timeout time.Duration) <-chan bool {
 
-	waiter := make(chan bool, 1)
-
-	select {
-	case <-time.After(timeout):
-		waiter <- false
-		close(waiter)
-	case <-mre.getSignal():
-		waiter <- true
-		close(waiter)
-	}
-	return waiter
+	return waitOne(mre.getSignal(), timeout)
 }
 
 func (mre *ManualResetEvent) getSignal() chan struct{} {

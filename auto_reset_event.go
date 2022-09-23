@@ -9,7 +9,7 @@ import (
 // signaled, then lets them all through
 type AutoResetEvent struct {
 	sync.RWMutex
-	signals chan bool
+	signals chan struct{}
 }
 
 var _ EventWaitHandle = &AutoResetEvent{}
@@ -25,25 +25,14 @@ func NewAutoResetEvent(signaled bool) *AutoResetEvent {
 }
 
 func (are *AutoResetEvent) WaitOne(timeout time.Duration) <-chan bool {
-
-	waiter := make(chan bool, 1)
-
-	select {
-	case <-time.After(timeout):
-		waiter <- false
-		close(waiter)
-	case <-are.getSignals():
-		waiter <- true
-		close(waiter)
-	}
-	return waiter
+	return waitOne(are.getSignals(), timeout)
 }
 
-func (are *AutoResetEvent) getSignals() chan bool {
+func (are *AutoResetEvent) getSignals() chan struct{} {
 	are.Lock()
 	defer are.Unlock()
 	if are.signals == nil {
-		are.signals = make(chan bool, 1)
+		are.signals = make(chan struct{}, 1)
 	}
 	return are.signals
 }
@@ -52,7 +41,7 @@ func (are *AutoResetEvent) Set() bool {
 
 	// this will hit default if buffer is full
 	select {
-	case are.getSignals() <- true:
+	case are.getSignals() <- struct{}{}:
 		return true
 	default:
 		return false
