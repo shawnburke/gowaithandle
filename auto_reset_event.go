@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,8 +25,13 @@ func NewAutoResetEvent(signaled bool) *AutoResetEvent {
 	return are
 }
 
-func (are *AutoResetEvent) WaitOne(timeout time.Duration) <-chan bool {
-	return waitOne(are.getSignals(), timeout)
+func (are *AutoResetEvent) WaitDuration(timeout time.Duration) <-chan bool {
+	ctx, _ := timeoutContext(timeout)
+	return are.WaitOne(ctx)
+}
+
+func (are *AutoResetEvent) WaitOne(ctx context.Context) <-chan bool {
+	return waitOne(ctx, are.getSignals())
 }
 
 func (are *AutoResetEvent) getSignals() chan struct{} {

@@ -1,9 +1,13 @@
 package gowaithandle
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type WaitHandle interface {
-	WaitOne(time.Duration) <-chan bool
+	WaitDuration(time.Duration) <-chan bool
+	WaitOne(context.Context) <-chan bool
 }
 
 type EventWaitHandle interface {

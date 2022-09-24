@@ -1,15 +1,15 @@
 package gowaithandle
 
 import (
-	"time"
+	"context"
 )
 
-func waitOne(sig chan struct{}, timeout time.Duration) <-chan bool {
+func waitOne(ctx context.Context, sig chan struct{}) <-chan bool {
 
 	waiter := make(chan bool, 1)
 
 	select {
-	case <-time.After(timeout):
+	case <-ctx.Done():
 		waiter <- false
 		close(waiter)
 	case <-sig:

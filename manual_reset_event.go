@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 )
@@ -26,8 +27,13 @@ func NewManualResetEvent(signaled bool) *ManualResetEvent {
 	return mre
 }
 
-func (mre *ManualResetEvent) WaitOne(timeout time.Duration) <-chan bool {
-	return waitOne(mre.getSignal(), timeout)
+func (mre *ManualResetEvent) WaitDuration(timeout time.Duration) <-chan bool {
+	ctx, _ := timeoutContext(timeout)
+	return mre.WaitOne(ctx)
+}
+
+func (mre *ManualResetEvent) WaitOne(ctx context.Context) <-chan bool {
+	return waitOne(ctx, mre.getSignal())
 }
 
 func (mre *ManualResetEvent) getSignal() chan struct{} {
@@ -53,7 +59,9 @@ func (mre *ManualResetEvent) getSignal() chan struct{} {
 
 func (mre *ManualResetEvent) Set() bool {
 	if atomic.CompareAndSwapInt32(&mre.signaled, 0, 1) {
-		close(mre.set)
+		if mre.set != nil {
+			close(mre.set)
+		}
 		return true
 	}
 	return false

@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"context"
 	"math/rand"
 	"sync/atomic"
 	"testing"
@@ -13,22 +14,28 @@ func TestAutoSimple(t *testing.T) {
 
 	auto := AutoResetEvent{}
 
-	res := <-auto.WaitOne(time.Millisecond)
+	to := time.Millisecond
+
+	res := <-auto.WaitDuration(to)
 	require.False(t, res)
 
 	auto.Set()
-
-	res = <-auto.WaitOne(time.Millisecond)
+	res = <-auto.WaitDuration(to)
 	require.True(t, res)
 
-	res = <-auto.WaitOne(time.Millisecond)
+	res = <-auto.WaitDuration(to)
+	require.False(t, res)
+
+	ctx, cancel := context.WithTimeout(context.Background(), to)
+	defer cancel()
+	res = <-auto.WaitOne(ctx)
 	require.False(t, res)
 
 	done := make(chan struct{})
 	go func() {
-		res = <-auto.WaitOne(time.Millisecond * 50)
+		defer close(done)
+		res = <-auto.WaitDuration(time.Millisecond * 50)
 		require.True(t, res)
-		close(done)
 	}()
 
 	time.Sleep(time.Millisecond * 5)
@@ -42,7 +49,7 @@ func TestAutoSignaled(t *testing.T) {
 
 	auto := NewAutoResetEvent(true)
 
-	res := <-auto.WaitOne(time.Millisecond)
+	res := <-auto.WaitDuration(time.Millisecond)
 	require.True(t, res)
 }
 
@@ -58,7 +65,7 @@ func TestAutoMulti(t *testing.T) {
 			ms := time.Duration(10 + rand.Intn(20))
 			time.Sleep(ms)
 
-			res := <-auto.WaitOne(time.Second / 2)
+			res := <-auto.WaitDuration(time.Second / 2)
 			if res {
 				atomic.AddInt32(&counter, 1)
 			}
