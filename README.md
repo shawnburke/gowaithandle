@@ -1,7 +1,11 @@
 # Go WaitHandle Library (gowaithandle)
 _An ode to .NET Framework synchronization classes_
 
-![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)  ![Go Report Card](https://goreportcard.com/badge/github.com/shawnburke/gowaithandle)
+![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)  
+
+![Go Report Card](https://goreportcard.com/badge/github.com/shawnburke/gowaithandle)
+
+[![codecov](https://codecov.io/gh/shawnburke/gowaithandle/branch/main/graph/badge.svg)](https://codecov.io/gh/shawnburke/gowaithandle)
 
 Go has great concurrency primatives but some are a bit too...primative.
 
@@ -9,7 +13,7 @@ At Microsoft, I was on the original .NET team and wrote exclusively C# for many 
 
 There are lots of good things about Go, but something I continually miss from .NET are the `System.Threading.EventHandle` classes, because they made it simple to configure a a handle and hand it out to callers via simple interface that abstracted the actual behavior of the handle. Whether it was a manual reset, or a semaphore, or something else, the caller would wait on it in the same way (`WaitOne`). This also allowed repeated signalling of that handle, which is something that gets complicated in Go; you can only close out a channel once, and the semantics of multiple receivers are fixed.
 
-While it is true that the Go primatives are very powerful and it is not terribly difficult to mimic each of these things with channels, `sync.Mutex`, and `sync.WaitGroup`, it often feels like more complexity in areas that are prone to subtle mistkes and nasty race conditions
+While it is true that the Go primatives are very powerful and it is not terribly difficult to mimic each of these things with channels, `sync.Mutex`, and `sync.WaitGroup`, it often feels like more complexity in areas that are prone to subtle mistakes and nasty race conditions
 
 So it seemed like a fun exercise to implement this functionality in Go.
 
