@@ -12,9 +12,8 @@ import (
 // thread at a time.
 type AutoResetEvent struct {
 	sync.RWMutex
-	signals  chan struct{}
-	created  int32
-	signaled int32
+	signals chan struct{}
+	created int32
 }
 
 var _ EventWaitHandle = &AutoResetEvent{}
@@ -34,9 +33,7 @@ func NewAutoResetEvent(signaled bool) *AutoResetEvent {
 // receive a true if the handle has been signaled, or false if the context
 // hits its timeout or deadline, or is cancelled.
 func (are *AutoResetEvent) WaitOne(ctx context.Context) <-chan bool {
-	return waitOne(ctx, are.getSignals(), func(res bool) {
-		atomic.AddInt32(&are.signaled, -1)
-	})
+	return waitOne(ctx, are.getSignals(), nil)
 }
 
 // Set signals the handle to let a single thread proceed and then immediately
@@ -47,7 +44,6 @@ func (are *AutoResetEvent) Set() bool {
 	// this will hit default if buffer is full
 	select {
 	case are.getSignals() <- struct{}{}:
-		atomic.AddInt32(&are.signaled, 1)
 		return true
 	default:
 		return false
@@ -56,7 +52,8 @@ func (are *AutoResetEvent) Set() bool {
 
 // Reset immediately sets the event to a non-signaled state
 func (are *AutoResetEvent) Reset() bool {
-	if atomic.LoadInt32(&are.signaled) > 0 {
+	sig := are.getSignals()
+	if len(sig) == cap(sig) {
 		<-are.getSignals()
 		return true
 	}
