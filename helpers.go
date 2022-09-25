@@ -92,11 +92,13 @@ func waitOne(ctx context.Context, sig chan struct{}, notify func(bool)) <-chan b
 		}
 	}
 
-	select {
-	case <-ctx.Done():
-		finish(false)
-	case <-sig:
-		finish(true)
-	}
+	go func() {
+		select {
+		case <-ctx.Done():
+			finish(false)
+		case <-sig:
+			finish(true)
+		}
+	}()
 	return waiter
 }

@@ -1,6 +1,6 @@
 # gowaithandle
 
-![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)
+![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)  ![Go Report Card](https://goreportcard.com/badge/github.com/shawnburke/gowaithandle)
 
 Go has great concurrency primatives but some are a bit too...primative.
 
@@ -164,4 +164,56 @@ This class also implements `WaitHandle` so can be used in the helpers:
     result := <- wg.WaitAll(ctx, wg, are)
 
     fmt.Println("Did it work?", result)
+```
+
+### Sempahore
+
+Implementation of a sempahore usable for limiting resources such as throttling or concurrency limiting.
+
+The `Sempaphore` also implements `WaitHandle` and can be used in `WaitAny` or `WaitAll`.
+
+To release a resource, call `Release`.
+
+```
+s := NewSemaphore(2)
+
+// take two resources
+<-s.WaitOne(context.Background())
+<-s.WaitOne(context.Background())
+
+// try for one second to get a third, which will time out
+ctx, cancel := context.WithTimeout(time.Second)
+defer cancel()
+if result := <-WaitOne(ctx); ! result {
+    fmt.Println("Timeout!")
+}
+
+s.Release()
+
+// now this will succeed
+result := <-s.WaitOne(context.Background())
+fmt.Println("Done", result)  // prints 'Done true'
+
+```
+
+This makes it very easy to implement something like throttling for an HTTP connection.
+
+Below we show how to build a simple middleware function that would limit connections and
+have proper behavior for timeouts and connection resets. If a connection was waiting on the sempahore and was dropped by the client, this code would give up rather than continue trying to aquire the resource.
+
+```
+    // limit an http route to 4 concurrent requests with a middleware
+    // component
+    var throttle = NewSempaphore(4)
+
+    func httpThrottleMiddleware(w http.ResponseWriter, r *http.Request, next http.Handler) {
+        
+        // we pass the request context here so if the request is disconnected
+        // or times out we don't take a resource
+        if <- throttle.WaitOne(r.Context()) {
+            defer throttle.Release()
+            
+            next.ServeHttp(w, r)
+        }
+    }
 ```
