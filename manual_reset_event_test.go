@@ -15,7 +15,7 @@ func TestManualSimple(t *testing.T) {
 	mre := NewManualResetEvent(false)
 
 	// test timeout
-	signaled := <-mre.WaitDuration(time.Millisecond)
+	signaled := <-mre.WaitOne(testTimeoutContext(time.Millisecond))
 	require.False(t, signaled)
 
 	wg := sync.WaitGroup{}
@@ -23,7 +23,7 @@ func TestManualSimple(t *testing.T) {
 	// test signal
 	go func() {
 		defer wg.Done()
-		s := <-mre.WaitDuration(time.Millisecond * 5)
+		s := <-mre.WaitOne(testTimeoutContext(time.Millisecond * 5))
 		require.True(t, s)
 		signaled = s
 	}()
@@ -32,14 +32,14 @@ func TestManualSimple(t *testing.T) {
 	require.True(t, signaled)
 
 	// test reset
-	signaled = <-mre.WaitDuration(time.Millisecond)
+	signaled = <-mre.WaitOne(testTimeoutContext(time.Millisecond))
 	require.True(t, signaled)
 	mre.Reset()
-	signaled = <-mre.WaitDuration(time.Millisecond)
+	signaled = <-mre.WaitOne(testTimeoutContext(time.Millisecond))
 	require.False(t, signaled)
 
 	mre = NewManualResetEvent(true)
-	res := <-mre.WaitDuration(time.Millisecond)
+	res := <-mre.WaitOne(testTimeoutContext(time.Millisecond))
 	require.True(t, res)
 }
 
@@ -60,7 +60,7 @@ func TestManualMultiSignaled(t *testing.T) {
 			// set a randome timeout and random start
 			wait := time.Millisecond * time.Duration(rand.Intn(20))
 			time.Sleep(wait)
-			res := <-mre.WaitDuration(time.Second / 2)
+			res := <-mre.WaitOne(testTimeoutContext(time.Second / 2))
 			if res {
 				atomic.AddInt32(&finished, 1)
 			}
@@ -81,7 +81,7 @@ func TestManualMultiNotSignaled(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := <-mre.WaitDuration(time.Second)
+			res := <-mre.WaitOne(testTimeoutContext(time.Second))
 			if res {
 				atomic.AddInt32(&finished, 1)
 			}

@@ -3,11 +3,10 @@ package gowaithandle
 import (
 	"context"
 	"sync/atomic"
-	"time"
 )
 
 // ManualResetEvent blocks all threads until
-// signaled, then lets them all through
+// signaled, then lets them all through when in that state
 type ManualResetEvent struct {
 	set        chan struct{}
 	setVersion int64
@@ -17,6 +16,8 @@ type ManualResetEvent struct {
 
 var _ EventWaitHandle = &ManualResetEvent{}
 
+// NewManualResetEvent creates the handle specifying
+// the sginal state.
 func NewManualResetEvent(signaled bool) *ManualResetEvent {
 	mre := &ManualResetEvent{}
 
@@ -27,13 +28,29 @@ func NewManualResetEvent(signaled bool) *ManualResetEvent {
 	return mre
 }
 
-func (mre *ManualResetEvent) WaitDuration(timeout time.Duration) <-chan bool {
-	ctx, _ := timeoutContext(timeout)
-	return mre.WaitOne(ctx)
+// WaitOne waits until the handle is signaled, then allows the caller to
+// proceed. Context can be used to set timeout or deadline or perform cancellation.
+// The return channel will have true if the handle was signaled, or false if the context
+// timed out or was cancelled.
+func (mre *ManualResetEvent) WaitOne(ctx context.Context) <-chan bool {
+	return waitOne(ctx, mre.getSignal(), nil)
 }
 
-func (mre *ManualResetEvent) WaitOne(ctx context.Context) <-chan bool {
-	return waitOne(ctx, mre.getSignal())
+// Set signals the handle to allow any blocked callers to proceed.
+func (mre *ManualResetEvent) Set() bool {
+	if atomic.CompareAndSwapInt32(&mre.signaled, 0, 1) {
+		if mre.set != nil {
+			close(mre.set)
+		}
+		return true
+	}
+	return false
+}
+
+// Reset sets the handle to the non-signaled state, such that
+// subsequent calls to WaitOne will block until Set is called.
+func (mre *ManualResetEvent) Reset() bool {
+	return atomic.CompareAndSwapInt32(&mre.signaled, 1, 0)
 }
 
 func (mre *ManualResetEvent) getSignal() chan struct{} {
@@ -55,18 +72,4 @@ func (mre *ManualResetEvent) getSignal() chan struct{} {
 		atomic.StoreInt64(&mre.setVersion, next)
 	}
 	return mre.set
-}
-
-func (mre *ManualResetEvent) Set() bool {
-	if atomic.CompareAndSwapInt32(&mre.signaled, 0, 1) {
-		if mre.set != nil {
-			close(mre.set)
-		}
-		return true
-	}
-	return false
-}
-
-func (mre *ManualResetEvent) Reset() bool {
-	return atomic.CompareAndSwapInt32(&mre.signaled, 1, 0)
 }

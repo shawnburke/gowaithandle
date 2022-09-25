@@ -26,6 +26,6 @@ func TestWaitGroup(t *testing.T) {
 func TestWaitGroupTimeout(t *testing.T) {
 	wg := WaitGroup{}
 	wg.Add(1)
-	res := <-wg.WaitDuration(time.Millisecond)
+	res := <-wg.WaitOne(testTimeoutContext(time.Millisecond))
 	require.False(t, res)
 }

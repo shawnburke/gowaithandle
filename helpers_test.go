@@ -1,6 +1,7 @@
 package gowaithandle
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,9 +17,7 @@ func TestWaitAll(t *testing.T) {
 	count := int32(0)
 	done := make(chan struct{})
 	go func() {
-		ctx, cancel := timeoutContext(time.Second)
-		defer cancel()
-		result := <-WaitAll(ctx, mre1, mre2)
+		result := <-WaitAll(testTimeoutContext(time.Second), mre1, mre2)
 		require.True(t, result)
 		atomic.StoreInt32(&count, 1)
 		close(done)
@@ -29,4 +28,14 @@ func TestWaitAll(t *testing.T) {
 	mre2.Set()
 	<-done
 	require.Equal(t, 1, int(count))
+}
+
+type contextKey string
+
+func testTimeoutContext(timeout time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+	// hack to avoid warning about cancel
+	ctx = context.WithValue(ctx, contextKey("foo"), cancel)
+	return ctx
 }

@@ -3,23 +3,17 @@ package gowaithandle
 import (
 	"context"
 	"sync/atomic"
-	"time"
 )
 
-func timeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
-	ctx := context.Background()
-	cancel := func() {}
-
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-	}
-	return ctx, cancel
-}
-
+// WaitAll waits for all of the handles to be signaled.
+// When successful, true is put onto the return channel, otherwise
+// false in the case of a timeout or other failure of any of the handles.
 func WaitAll(ctx context.Context, ev ...WaitHandle) <-chan bool {
 	return waitMultipleCore(ctx, modeAll, ev...)
 }
 
+// WaitAny waits for any of the handles to be signaled, then returns true
+// on the return channel
 func WaitAny(ctx context.Context, ev ...WaitHandle) <-chan bool {
 	return waitMultipleCore(ctx, modeAny, ev...)
 }
@@ -76,4 +70,33 @@ func waitMultipleCore(ctx context.Context, mode mode, ev ...WaitHandle) <-chan b
 	}()
 
 	return done
+}
+
+// waitOne is a helper function that takes a context and a signal channel and returns
+// a bool channel.
+//
+// The channel will contain TRUE if the signal channel receives a message.  Otherwise,
+// it will contain FALSE if the context times out or is cancelled.
+func waitOne(ctx context.Context, sig chan struct{}, notify func(bool)) <-chan bool {
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	waiter := make(chan bool, 1)
+
+	finish := func(result bool) {
+		waiter <- result
+		close(waiter)
+		if notify != nil {
+			notify(result)
+		}
+	}
+
+	select {
+	case <-ctx.Done():
+		finish(false)
+	case <-sig:
+		finish(true)
+	}
+	return waiter
 }
