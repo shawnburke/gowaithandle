@@ -1,5 +1,7 @@
 # gowaithandle
 
+![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)
+
 Go has great concurrency primatives but some are a bit too...primative.
 
 I spent many years writing C# against .NET but then joined Uber and did almost exclusively Go.
