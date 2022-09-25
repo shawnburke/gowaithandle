@@ -1,14 +1,17 @@
-# gowaithandle
+# Go WaitHandle Library (gowaithandle)
+_An ode to .NET Framework synchronization classes_
 
 ![Go Test](https://github.com/shawnburke/gowaithandle/actions/workflows/go.yml/badge.svg)  ![Go Report Card](https://goreportcard.com/badge/github.com/shawnburke/gowaithandle)
 
 Go has great concurrency primatives but some are a bit too...primative.
 
-I spent many years writing C# against .NET but then joined Uber and did almost exclusively Go.
+At Microsoft, I was on the original .NET team and wrote exclusively C# for many years after that. In 2015, I joined Uber and for my 5+ years there I wrote almost exclusively Go.
 
-One thing that I would constantly miss were the `EventHandle` classes from `System.Threading` because they allowed repeated signaling of the same handle. After writing this, I've gained a better appreciation for those Go primatives: it's true that with a good understanding of them you can mimic most of these behaviors. However, it requires a good understanding and sometimes it's nice to have things wrapped up.
+There are lots of good things about Go, but something I continually miss from .NET are the `System.Threading.EventHandle` classes, because they made it simple to configure a a handle and hand it out to callers via simple interface that abstracted the actual behavior of the handle. Whether it was a manual reset, or a semaphore, or something else, the caller would wait on it in the same way (`WaitOne`). This also allowed repeated signalling of that handle, which is something that gets complicated in Go; you can only close out a channel once, and the semantics of multiple receivers are fixed.
 
-And it wa a fun exercise, so here you go.
+While it is true that the Go primatives are very powerful and it is not terribly difficult to mimic each of these things with channels, `sync.Mutex`, and `sync.WaitGroup`, it often feels like more complexity in areas that are prone to subtle mistkes and nasty race conditions
+
+So it seemed like a fun exercise to implement this functionality in Go.
 
 They are written using Go idioms and (mostly) lockless synchronization and so should be fast and lightweight.
 
@@ -16,13 +19,50 @@ They are written using Go idioms and (mostly) lockless synchronization and so sh
 
 The main classes are:
 
-* `AutoResetEvent` - lets a single thread through for each call to `Set` then toggles back.
-* `ManualResetEvent` - allows toggling to signaled, which will let all threads through until `Reset` is called.
+* [`AutoResetEvent`](#autoresetevent) - lets a single thread through for each call to `Set` then toggles back.
+* [`ManualResetEvent`](#manualresetevent) - allows toggling to signaled, which will let all threads through until `Reset` is called.
+* [`WaitGroup`](#waitgroup) - derived implementation of `sync.WaitGroup` that returns a channel and supports timeout and cancel behavior
+* [`Sempahore`](#sempahore) - semaphore that can be used to limit access to a resource or implement throttling or concurrency limitation.
 
-These classes implement the `WaitHandle` interface which supports waiting with `context.Context` which supports timeouts, deadlines, and cancellation.
+These classes implement the `WaitHandle` interface which supports waiting with `WaitOne(context.Context)` allowing timeouts, deadlines, and cancellation.
+
+Basic usage against this interafce is always the same
 
 ```
-WaitOne(ctx context.Context) <-chan bool // false means timed out
+eh := &gowaithandle.AutoResetEvent{}
+
+go func() {
+
+    // wait a second then fail
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	
+    ok := <-eh.WaitOne()
+
+    if ok {
+        // we got it
+        doSomething()
+        return
+    }
+    log.Println("ERROR: failed to get handle")
+
+}()
+
+// allow the thread to continue
+eh.Set()
+
+// create another one
+mh := &gowaithandle.ManualResetEvent{}
+
+go func() {
+    ok := <-gowaithandle.WaitAll(context.Background(), eh, mh)
+    log.Println("All signaled!")
+}()
+
+// signal them both will allow the above to continue
+eh.Set()
+mh.Set()
+
 ```
 
 Plus helpers `WaitAll` or `WaitAny` which are useful for dynamic situations where `case` is not possible.
