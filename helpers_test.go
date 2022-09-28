@@ -28,6 +28,11 @@ func TestWaitAll(t *testing.T) {
 	mre2.Set()
 	<-done
 	require.Equal(t, 1, int(count))
+
+	mre1.Reset()
+	// test timeout
+	res := <-WaitAll(testTimeoutContext(time.Millisecond), mre1, mre2)
+	require.False(t, res)
 }
 
 func TestWaitAny(t *testing.T) {

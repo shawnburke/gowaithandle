@@ -30,7 +30,7 @@ The main classes are:
 
 These classes implement the `WaitHandle` interface which supports waiting with `WaitOne(context.Context)` allowing timeouts, deadlines, and cancellation.
 
-Basic usage against this interafce is always the same
+Basic usage against this interafce is always the same, which is to create the object then waiters call `WaitOne`.
 
 ```
 eh := &gowaithandle.AutoResetEvent{}
@@ -242,7 +242,7 @@ fmt.Println("Done", result)  // prints 'Done true'
 
 This makes it very easy to implement something like throttling for an HTTP connection.
 
-Below we show how to build a simple middleware function that would limit connections and
+Below we demonstrate how to build a simple middleware function that would limit connections and
 have proper behavior for timeouts and connection resets. If a connection was waiting on the sempahore and was dropped by the client, this code would give up rather than continue trying to aquire the resource.
 
 ```
@@ -258,6 +258,8 @@ have proper behavior for timeouts and connection resets. If a connection was wai
             defer throttle.Release()
             
             next.ServeHttp(w, r)
+        } else {
+            w.WriteHeader(429)
         }
     }
 ```
